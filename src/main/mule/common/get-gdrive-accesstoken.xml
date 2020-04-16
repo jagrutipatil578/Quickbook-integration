@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:os="http://www.mulesoft.org/schema/mule/os"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd 
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd">
+	<flow name="get-gdrive-accesstoken-flow" doc:id="cc2dfea5-2438-4297-9118-be65d42d9000" >
+		<scheduler doc:name="Scheduler" doc:id="bb8d51b2-602e-4913-ab1f-d45c57808ae7" >
+			<scheduling-strategy >
+				<fixed-frequency frequency="3580" timeUnit="SECONDS"/>
+			</scheduling-strategy>
+		</scheduler>
+		<ee:transform doc:name="Parameters for Access Token" doc:id="33eb2681-78d1-4b77-a507-a3ca7f96cba0" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"grant_type": "refresh_token",
+    "refresh_token": p('getgdriveaccesstoken.refreshtoken'),
+    "client_id": p('getgdriveaccesstoken.client_id'),
+    "client_secret": p('getgdriveaccesstoken.client_secret') 
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="c088f6fd-a71c-4398-a8b3-765818b3f0cb" message="******************** Started Creating GDrive Access Token ************************"/>
+		<http:request method="POST" doc:name="Get Access Token" doc:id="d70330cc-b617-405f-bb34-86d4c14c9919" path="${getgdriveaccesstoken.path}" config-ref="GDrive_HTTP_Request_configuration" responseTimeout="40000">
+			<http:headers ><![CDATA[#[output application/java
+---
+{
+	"Content-Type" : "application/json"
+}]]]></http:headers>
+		</http:request>
+		<os:store doc:name="Store Access Token" doc:id="b6ca9e8f-3146-4147-94b1-5cffe0569958" key="access_token_gdrive" objectStore="Object_store">
+			<os:value ><![CDATA[#["Bearer " ++ payload.access_token]]]></os:value>
+		</os:store>
+		<logger level="INFO" doc:name="Logger" doc:id="5f09b3d1-c4af-45e8-80fa-b160cba1a8ed" message="******************** Completed Creating GDrive Access Token using refresh token************************"/>
+	
+</flow>
+	
+	</mule>

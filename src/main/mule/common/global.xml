@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:os="http://www.mulesoft.org/schema/mule/os"
+	xmlns:email="http://www.mulesoft.org/schema/mule/email"
+	xmlns:file="http://www.mulesoft.org/schema/mule/file" xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/email http://www.mulesoft.org/schema/mule/email/current/mule-email.xsd 
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd">
+	<http:request-config name="Sandbox_HTTP_Request_configuration" doc:name="HTTP Request configuration" doc:id="2ee3f377-0aa7-4656-babb-7152ffc85f86" >
+		<http:request-connection protocol="HTTPS" host="${http_request_connection.sandbox_host}" />
+	</http:request-config>
+	<http:request-config name="Invoke_HTTP_Request_configuration" doc:name="HTTP Request configuration" doc:id="3151cb3b-321b-4060-bc6f-2f50da38e4ca" >
+		<http:request-connection host="${http_listener_connection.host}" port="${http_listener_connection.port}" />
+	</http:request-config>
+	
+	<http:request-config name="Zoho_HTTP_Request_configuration" doc:name="HTTP Request configuration" doc:id="6a1224fe-703f-4ef6-984f-47fe99a74a28" >
+		<http:request-connection host="${http_request_connection.zoho_host}" port="${http_request_connection.zoho_port}" connectionIdleTimeout="30000000"/>
+	</http:request-config>
+	<http:request-config name="Intuit_HTTP_Request_configuration" doc:name="HTTP Request configuration" doc:id="20f53e5f-1de3-421c-b137-d4a1913d47a4" >
+		<http:request-connection protocol="HTTPS" host="${http_request_connection.intuit_host}" />
+	</http:request-config>
+	<http:request-config name="Zoho_People_HTTP_Request_configuration" doc:name="HTTP Request configuration" doc:id="d7820076-a708-4ab5-be19-6ef66d5a796e" >
+		<http:request-connection protocol="HTTPS" host="${http_request_connection.zoho_people_host}" />
+	</http:request-config>
+	<configuration-properties doc:name="Configuration properties" doc:id="0551ca33-e8c0-4f37-97da-65e0628fb68e" file="dev.yaml" />
+	<os:object-store name="Object_store" doc:name="Object store" doc:id="c43d249b-03a8-46fc-bf66-6aa86fd3d661" />
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="7c39ce67-dd8b-412a-aa33-d25d9ed4e432" >
+		<http:listener-connection host="${http_listener_connection.host}" port="${http_listener_connection.port}" />
+	</http:listener-config>
+	<http:request-config name="GDrive_HTTP_Request_configuration" doc:name="HTTP Request configuration" doc:id="905634a9-a7ca-42e6-8584-bc78b38f30b0" >
+		<http:request-connection protocol="HTTPS" host="${http_request_connection.gdrive_host}" />
+	</http:request-config>
+	<configuration doc:name="Configuration" doc:id="7f2e2d39-f659-4729-a9fd-d7cd6bda0fe5" defaultErrorHandler-ref="globalError_Handler" />
+	<error-handler name="globalError_Handler" doc:id="55a8af01-7d64-4da6-9f28-ff8114785d7a" >
+		<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="96af1dd9-c7f2-43a1-a0e4-10fe0aba732e" type="ANY">
+			<logger level="INFO" doc:name="Logger" doc:id="d7ce775c-821e-4a31-a4b5-62fd62c9c59a" message="*************Something went Wrong Please try again...............***************"/>
+		</on-error-propagate>
+	</error-handler>
+	
+</mule>

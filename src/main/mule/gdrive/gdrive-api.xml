@@ -1,0 +1,225 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:java="http://www.mulesoft.org/schema/mule/java"
+	xmlns:os="http://www.mulesoft.org/schema/mule/os"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:file="http://www.mulesoft.org/schema/mule/file" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd 
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd 
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd
+http://www.mulesoft.org/schema/mule/java http://www.mulesoft.org/schema/mule/java/current/mule-java.xsd">
+	<os:object-store name="rate_store" doc:name="Object store" doc:id="3bfc7fff-59d5-4ac8-80fa-facb0d830303" />
+	<file:config name="File_Config" doc:name="File Config" doc:id="fb69c379-1981-4cc3-bb42-f21145d50b73" />
+	<sub-flow name="UploadMain" doc:id="49cf9413-b1e6-406c-a3ff-c91a6df1a3e0" >
+		<flow-ref doc:name="GetInvoice" doc:id="deef165c-71b7-4bb7-903b-7d2eea79ec73" name="GetInvoice" />
+		<flow-ref doc:name="UploadFile" doc:id="3d3d4828-0b35-40fe-83f5-97a81053b021" name="UploadFile" />
+	</sub-flow>
+	<sub-flow name="InitializeVariables" doc:id="faaa3a81-5f83-4429-921f-200ace46e74e" >
+		<set-variable value="#[attributes.uriParams.projectname]" doc:name="Project Name" doc:id="17d86f89-b6a2-4df0-abbb-1d4c774c4852" variableName="project_name" />
+		<set-variable value="#[attributes.uriParams.invoiceID]" doc:name="InvoiceId" doc:id="a2492945-aa99-43b9-915a-c5b0f7cdd6e4" variableName="InvoiceId" />
+	</sub-flow>
+	<sub-flow name="UploadFile" doc:id="ddf888e3-a04a-4837-9ca0-804045ed1051" >
+		<os:retrieve doc:name="Retrieve GDrive Token" doc:id="ca4efd2f-8f79-4e59-abf3-15b5faf44cdd" key="access_token_gdrive" objectStore="Object_store" target="token">
+			<os:default-value><![CDATA[#[null]]]></os:default-value>
+		</os:retrieve>
+		<ee:transform doc:name="Transform Message" doc:id="429a2111-d139-4182-8238-ca82056d4f9f">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	
+"name" : vars.project_name ++ "-"++ now() as String  {format: "dd-MM-yyyy"} ,
+"parents" : [p('gdrive.rootfolder')]
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<http:request method="POST" doc:name="create_file" doc:id="b7e3d008-74f7-4dbc-b496-f3d347a91063" config-ref="GDrive_HTTP_Request_configuration" url="${gdrive.gdrive_path}" responseTimeout="2000000">
+			<http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : vars.token
+}]]]></http:headers>
+		</http:request>
+		<http:request method="PATCH" doc:name="Request" doc:id="6f17ce70-ece6-408b-8473-700a9b5f8bc1" url='#["https://www.googleapis.com/upload/drive/v3/files/" ++ payload.id ++ "?key=AIzaSyCZj4se_Xr6-4vY7w3Wgym78CoYvPWh4oM"]' config-ref="GDrive_HTTP_Request_configuration" responseTimeout="2000000">
+			<http:body><![CDATA[#[vars.content]]]></http:body>
+			<http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : vars.token,
+	"Accept" : payload.mimeType,
+	"Content-Type" : payload.mimeType
+}]]]></http:headers>
+		</http:request>
+	</sub-flow>
+	<sub-flow name="GetInvoice" doc:id="035f1d85-8441-45d7-8520-38ffb4412845" >
+		<os:retrieve doc:name="Retrieve QBToken" doc:id="bfefb7f6-501d-406f-baa9-7a0de04a9c1b" key="access_tokenQB" objectStore="Object_store" target="QB">
+			<os:default-value><![CDATA[#[null]]]></os:default-value>
+		</os:retrieve>
+		<logger level="INFO" doc:name="Logger" doc:id="0143c8de-dc5f-4213-9a9f-d8a885bee1e0" message="#[vars.QB]"/>
+		<http:request method="GET" doc:name="Get Invoice from QB" doc:id="fa7f8fce-f21f-467a-9c8c-05388bcc80c7" config-ref="Sandbox_HTTP_Request_configuration" path="${gdrive.invoice_path}" outputMimeType="application/pdf" target="content" responseTimeout="40000">
+			<http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : vars.QB
+}]]]></http:headers>
+			<http:uri-params><![CDATA[#[output application/java
+---
+{
+	"id" : vars.InvoiceId
+}]]]></http:uri-params>
+		</http:request>
+		<ee:transform doc:name="Transform Message" doc:id="08b5bde5-f1c3-4489-93e6-3b93bb4495f4" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/csv
+---
+vars.content]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</sub-flow>
+	<flow name="gdrive-api-flow" doc:id="9334571c-a2d6-4e18-a2b2-f8865a543e78">
+		<http:listener doc:name="GDrive Listener" doc:id="53f37388-d7e8-445c-b320-e96507ed3033" path="${gdrive.listener_path}" allowedMethods="GET" config-ref="HTTP_Listener_config">
+			<http:response >
+				<http:headers ><![CDATA[#[output application/java
+---
+{
+	"Access-Control-Allow-Origin" : "*"
+}]]]></http:headers>
+			</http:response>
+		</http:listener>
+		<logger level="INFO" doc:name="Logger" doc:id="bb888771-bd93-46c4-a83b-e87fab4cabc0" message="**************Started uploading invoice on Google Drive******************"/>
+		<flow-ref doc:name="InitializeVariables" doc:id="395913d6-0074-42fe-837f-a54abe0b31ab" name="InitializeVariables" />
+		<flow-ref doc:name="UploadMain" doc:id="d9fa072b-7436-4c72-9bce-5bb3182e9e7f" name="UploadMain" />
+		<set-payload value='"Invoice Successfully uploaded to the Google Drive"' doc:name="Set Payload" doc:id="511f5c4b-faa0-4511-862d-4cfdce626d6d" />
+		
+	
+</flow>
+	<flow name="retreiveRate" doc:id="327e6db2-ed78-4c96-87b5-717754564dde" >
+		<flow-ref doc:name="Flow Reference" doc:id="df8eafe2-999a-479c-8b19-0448e750a495" name="gdrive-readFile"/>
+		<ee:transform doc:name="Transform Message" doc:id="81a7a31b-2550-4258-85cb-593bcfb15284" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+(payload filter ($.Project == vars.project and $.Resource == vars.resource) map $)[0]]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="ec42b103-a376-4f85-b857-57aa537dba1c" message="#[payload]"/>
+	</flow>
+	<flow name="gdrive-readFile" doc:id="b8b5c762-c790-4edd-8a65-0556347549c3" >
+		<http:listener doc:name="Listener" doc:id="7a6cc0e4-8b12-4f3b-be5a-dd46ce3c0706" config-ref="HTTP_Listener_config" path="/rates"/>
+		<set-variable value="#[p('rateFileId')]" doc:name="fileID" doc:id="7c5673ad-41ba-4a76-abe8-c3f197ea3d8a" variableName="fileID"/>
+		<flow-ref doc:name="Flow Reference" doc:id="d18c8883-c335-46f8-9224-8efe1182beb2" name="get-gdrive-accesstoken-flow"/>
+		<os:retrieve doc:name="Retrieve GDrive Token" doc:id="f533837c-2077-41cb-b6f0-c08c71534d08" key="access_token_gdrive" objectStore="Object_store" target="token" >
+			<os:default-value ><![CDATA[#[null]]]></os:default-value>
+		</os:retrieve>
+		<http:request method="GET" doc:name="getFile" doc:id="39c6f438-5198-4ced-bf5b-6353e24228c2" url='#["https://www.googleapis.com/drive/v2/files/" ++ vars.fileID ++ "/export?alt=media&amp;acknowledgeAbuse=true&amp;mimeType=text/csv"]' >
+			<http:headers ><![CDATA[#[output application/java
+---
+{
+	"Authorization" : vars.token
+}]]]></http:headers>
+		</http:request>
+		<ee:transform doc:name="Transform Message" doc:id="995f46e1-804f-45e1-a33f-40033659d5c0">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="7e36af6c-1869-42b9-aa8f-7006f779ac35" message="#[payload]"/>
+		<logger level="INFO" doc:name="Logger" doc:id="5af455d4-3fbd-4507-b9eb-cbb1e976a37a" message="#[payload]"/>
+	</flow>
+	<flow name="getFilesFromdrive" doc:id="350b3eaf-301c-46ad-b1b1-4f1fb34ff545" >
+		<http:listener doc:name="Listener" doc:id="a74cc9bd-0c3b-4638-95e5-d95acd1099a6" config-ref="HTTP_Listener_config" path="/files"/>
+		<flow-ref doc:name="token flow" doc:id="42f49a1d-9f53-4eb7-b9c2-a6d30ff0462c" name="get-gdrive-accesstoken-flow"/>
+		<os:retrieve doc:name="Retrieve GDrive Token" doc:id="dbf83704-78c2-4566-b71c-736ff09ab665" key="access_token_gdrive" objectStore="Object_store" target="token">
+			<os:default-value ><![CDATA[null]]></os:default-value>
+		</os:retrieve>
+		<http:request method="GET" doc:name="getFile" doc:id="2199de70-a56d-4c33-a43f-a0f78505ed5e" url='#["https://www.googleapis.com/drive/v2/files"]' >
+			<http:headers ><![CDATA[#[output application/java
+---
+{
+	"Authorization" : vars.token
+}]]]></http:headers>
+		</http:request>
+		<ee:transform doc:name="Transform Message" doc:id="49faa8fa-838e-471e-ad7f-68dd6047955f" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload.items.embedLink[0]]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+	<flow name="getInvoiceBeforeUploading" doc:id="924932cd-3f51-458f-8a21-11c6e91a8bd1" >
+		<http:listener doc:name="GDrive Listener" doc:id="4b0e0043-0775-42ad-9a5d-3b104645ea53" config-ref="HTTP_Listener_config" path="${qbook.checkInvoice_path}" allowedMethods="GET" >
+			<http:response >
+				<http:headers ><![CDATA[#[output application/java
+---
+{
+	"Access-Control-Allow-Origin" : "*"
+}]]]></http:headers>
+			</http:response>
+		</http:listener>
+		<logger level="INFO" doc:name="Logger" doc:id="d8a00191-2b0b-4fb9-97d9-d8df885604a7" message="**************Started fetching invoice ******************" />
+		<flow-ref doc:name="InitializeVariables" doc:id="d49a792c-3d9e-4d40-825f-a152b729a62a" name="InitializeVariables" />
+		<flow-ref doc:name="getInvoice" doc:id="651258cd-9668-42d2-8c9d-71511b4aec86" name="GetInvoice" />
+		<ee:transform doc:name="Transform Message" doc:id="6f4b92b8-b191-4cac-9ec4-b2e8bf811b3b" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[
+vars.content
+]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+	<flow name="Copy_of_deleteInvoice" doc:id="f0abdb73-f019-4cf3-bdbc-83f6cbd93d3e" >
+		<http:listener doc:name="Listener" doc:id="2775f339-2fa2-46ab-bb73-f9e2be131564" config-ref="HTTP_Listener_config" path="${qbook.deleteInvoice_path}" allowedMethods="DELETE" >
+			<http:response >
+				<http:headers ><![CDATA[#[output application/java
+---
+{
+	"Access-Control-Allow-Origin" : "*"
+}]]]></http:headers>
+			</http:response>
+		</http:listener>
+		<logger level="INFO" doc:name="Logger" doc:id="0bc3c5b5-a01f-4dd9-92fe-d9d512eb6528" message="**************Started deleting invoice ******************" />
+		<set-variable value="#[attributes.uriParams.invoiceID]" doc:name="InvoiceId" doc:id="90407c6e-33b6-43ec-aa14-a7a2f75340ca" variableName="InvoiceId" />
+		<os:retrieve doc:name="Retrieve QBToken" doc:id="744df35b-322b-4322-b49f-3465a89bad09" key="access_tokenQB" objectStore="Object_store" target="QB" >
+			<os:default-value ><![CDATA[#[null]]]></os:default-value>
+		</os:retrieve>
+		<ee:transform doc:name="Transform Message" doc:id="ad5cec01-6cf5-492b-a5d4-ad785a73b821" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+  "SyncToken": "0",
+  "Id": vars.invoiceId
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<http:request method="POST" doc:name="Request" doc:id="0a559056-63bf-46a0-b443-26c134e6f4a7" config-ref="Sandbox_HTTP_Request_configuration" path="${qbook.deletePath}" outputMimeType="application/xml" >
+			<http:headers ><![CDATA[#[output application/java
+---
+{
+	"Authorization" : vars.QB
+}]]]></http:headers>
+		</http:request>
+		<ee:transform doc:name="Transform Message" doc:id="fb302024-7a99-4fd2-be3a-871b93fa0978" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+"Successfully deleted invoice id " ++ payload.IntuitResponse.Invoice.Id]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+	
+	
+</mule>

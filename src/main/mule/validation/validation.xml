@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:os="http://www.mulesoft.org/schema/mule/os" xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd">
+	<os:object-store name="invoiceStore" doc:name="Object store" doc:id="55bda57e-07f1-476f-8ecc-8412b74131b7" />
+	<flow name="storeInvoiceID" doc:id="983ed873-2b46-4328-a4a2-835619d16ebf" >
+		<os:store doc:name="Store InvoiceID" doc:id="e2d52671-071e-41dd-af49-6e27189ab80c" key="#[vars.project ++ vars.resource]" objectStore="invoiceStore">
+			<os:value ><![CDATA[#[vars.invoiceID]]]></os:value>
+		</os:store>
+	</flow>
+	<flow name="validateInvoice" doc:id="82bd5aa3-a036-4691-9a07-efa02a3926d5" >
+		<flow-ref doc:name="retreiveInvoiceID" doc:id="5b0dcbb5-372b-4957-89bb-ce36dba51e56" name="retreiveInvoiceID"/>
+	</flow>
+	<flow name="retreiveInvoiceID" doc:id="30a37956-b49b-44e0-988c-e5d14b2615e0" >
+		<os:retrieve doc:name="Retrieve InvoiceID" doc:id="63de35e7-918a-4404-97df-cc80197a8473" objectStore="invoiceStore" key="#[vars.project ++ vars.resource]" target="invoiceID">
+			<os:default-value ><![CDATA[0]]></os:default-value>
+		</os:retrieve>
+	</flow>
+</mule>

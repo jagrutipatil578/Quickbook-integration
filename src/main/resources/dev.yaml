@@ -1,0 +1,60 @@
+getqbaccesstoken:
+  refreshtoken: "AB11595414554DcmGhh5TmgrQuaSSXmq8lOU3M3doHGx5iOsQS"
+  authorization: "Basic QUJVZnVCc1NCcjB3U0JJd1hIWWdSV2JaYkhwSW9iOU1Sd3phQUNhU2g2d1ZhMUNtTmI6WkhpRnlITjJSeFVjbk1KelhNRkxrNzdKa3A2ZDE1YmQ4ZW05SHJxRA=="  
+  path: "/oauth2/v1/tokens/bearer"
+  
+getgdriveaccesstoken:
+  refreshtoken: "1//04FHTU3Rj525ECgYIARAAGAQSNwF-L9Ir9YW5w-UV6s8xHhDa4sWJUUGxNUErF1YBvUOZkCuShGhFvYjowIQ8OS1dHJPoqRYDG0k"
+  client_id: "816816554803-st4lhr1ee2gcao9a3mrj2e94mtgf6km3.apps.googleusercontent.com"
+  client_secret: "7HS3OSgg-fhR2SQtZMdE8jSM"
+  path: "/o/oauth2/token"
+  
+zoho:
+  authtoken: "8dec4fad34070486a1890c1494df2cd8"  
+  listener_path: "/timesheets/{name}"
+  getprojects_path: "/people/api/timetracker/getprojects"
+  getprojectdeatils_path: "/people/api/timetracker/getprojectdetails"
+  gettimesheet_path: "/people/api/timetracker/gettimesheet"
+  gettimesheetdetails_path: "/people/api/timetracker/gettimesheetdetails"
+
+get_employees:
+  listener_path: "/getallactiveemployees"
+  getemployeespath: "/people/api/forms/P_EmployeeView/records"
+  recordlimit: "200"
+  
+get_projects:
+  listener_path: "/getallprojects"
+  
+gdrive:
+  rootfolder: "1UVO1TFG0iRenrSnMtkR07hBnes77aOBD"
+  listener_path: "/upload/{projectname}/{invoiceID}"
+  invoice_path: "/v3/company/4620816365015366750/invoice/{id}/pdf?minorversion=45"
+  gdrive_path: "https://www.googleapis.com/drive/v3/files?key=AIzaSyCZj4se_Xr6-4vY7w3Wgym78CoYvPWh4oM"
+  delete_path: "/v3/company/9130347960763056/invoice?operation=delete&minorversion=47"
+  
+qbook:
+  listener_path: "/createinvoice/{name}"
+  zoho_path: "/timesheets/{name}"
+  invoice_path: "/v3/company/4620816365015366750/invoice?minorversion=47"
+  email_invoice_path: "/v3/company/4620816365015366750/invoice/{id}/send"
+  deletePath: "/v3/company/4620816365015366750/invoice?operation=delete&minorversion=47"
+  upload_path: "/upload/{projectname}/{invoiceID}" 
+  checkInvoice_path: "/checkInvoice/{projectname}/{invoiceID}" 
+  emailInvoice_path: "/emailInvoice/{invoiceID}"
+  deleteInvoice_path: "/deleteInvoice/{invoiceID}"
+  
+http_request_connection:
+  sandbox_host: "sandbox-quickbooks.api.intuit.com"
+  zoho_host: "localhost"
+  zoho_port: "8081" 
+  intuit_host: "oauth.platform.intuit.com"
+  zoho_people_host: "people.zoho.com"
+  gdrive_host: "accounts.google.com"
+  
+http_listener_connection:
+  host: "0.0.0.0"
+  port: "8081"
+  
+rateFileId: "1w0D_jDrCqOwl7RWn7V3_j9YD_919717W6qjfuiVcN_U"
+  
+  

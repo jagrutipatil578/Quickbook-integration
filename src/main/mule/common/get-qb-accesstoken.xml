@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:file="http://www.mulesoft.org/schema/mule/file"
+	xmlns:os="http://www.mulesoft.org/schema/mule/os"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd 
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd">
+	<flow name="get-qb-accesstoken-flow" doc:id="969e9ab0-f663-4825-a5e9-be15b94e49bc" initialState="started">
+		<scheduler doc:name="Scheduler" doc:id="84289d01-612f-42a0-8b17-81d663f5e115" >
+			<scheduling-strategy >
+				<fixed-frequency frequency="3580" timeUnit="SECONDS"/>
+			</scheduling-strategy>
+		</scheduler>
+		<os:retrieve doc:name="Retrieve" doc:id="e8803a7f-6042-4991-9de8-4a41c100b722" key="refresh_tokenQB" target="token" objectStore="Object_store">
+			<os:default-value ><![CDATA[#[p('getqbaccesstoken.refreshtoken')]]]></os:default-value>
+		</os:retrieve>
+		<ee:transform doc:name="Parameters For Access Token" doc:id="d5b83bb3-7c0a-4c63-b729-12a3290e919c">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/java
+---
+write({
+"grant_type" :"refresh_token",
+"refresh_token": "AB11595733922gP6v5H1ExFDhmemR4sGfxCk8MjGGJD32jiwYu"
+},'application/x-www-form-urlencoded')]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="7130a1c7-af20-4cad-9c00-dab5cc546b6b" message="******************** Started Creating QB Access Token ************************" />
+		<http:request method="POST" doc:name="Get Access Token" doc:id="f9a9cc92-2ae1-4e9c-95a5-458a719524c9" config-ref="Intuit_HTTP_Request_configuration" path="${getqbaccesstoken.path}" outputMimeType="application/json">
+			<http:headers><![CDATA[#[output application/java
+---
+{
+	"Content-Type" : "application/x-www-form-urlencoded",
+	"Authorization" : p('getqbaccesstoken.authorization')
+}]]]></http:headers>
+		</http:request>
+		<os:store doc:name="Store Refresh Token" doc:id="e13a299e-7c0f-4d0b-9d59-77c5cc885203" key="refresh_tokenQB" objectStore="Object_store" >
+			<os:value ><![CDATA[#[payload.refresh_token]]]></os:value>
+		</os:store>
+		<os:store doc:name="Store QB Access Token" doc:id="f65cdac5-6444-4386-9676-7ad3362ccb0d" key="access_tokenQB" objectStore="Object_store">
+			<os:value><![CDATA[#["Bearer " ++ payload.access_token]]]></os:value>
+		</os:store>
+		<logger level="INFO" doc:name="Logger" doc:id="1cdb774f-2e0b-4eb8-b977-79c10a90019a" message="#[payload]"/>
+		<logger level="INFO" doc:name="Logger" doc:id="6d9873b5-9ce1-4d23-9c50-217fb0774969" message="******************** Completed Creating QB Access Token using refresh token************************"/>
+	
+</flow>
+	
+	</mule>

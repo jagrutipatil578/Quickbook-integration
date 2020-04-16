@@ -1,0 +1,256 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:java="http://www.mulesoft.org/schema/mule/java" xmlns:servicenow="http://www.mulesoft.org/schema/mule/servicenow"
+	xmlns:os="http://www.mulesoft.org/schema/mule/os"
+	xmlns:email="http://www.mulesoft.org/schema/mule/email" xmlns:file="http://www.mulesoft.org/schema/mule/file" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+http://www.mulesoft.org/schema/mule/email http://www.mulesoft.org/schema/mule/email/current/mule-email.xsd
+http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd
+http://www.mulesoft.org/schema/mule/servicenow http://www.mulesoft.org/schema/mule/servicenow/current/mule-servicenow.xsd
+http://www.mulesoft.org/schema/mule/java http://www.mulesoft.org/schema/mule/java/current/mule-java.xsd">
+	<sub-flow name="getDetails" doc:id="3a59843b-6f0f-4c35-8d91-e194928cab55" >
+		<choice doc:name="Choice" doc:id="61b9afb1-d4c1-44a8-9777-bdc8af756e7a">
+			<when expression='#[vars.invoiceID == "0"]'>
+				<http:request method="GET" doc:name="Get Timesheet Details" doc:id="558a6b53-5dff-42a1-a56a-670ce940d742" config-ref="Zoho_HTTP_Request_configuration" path="${qbook.zoho_path}" responseTimeout="300000000">
+			<http:uri-params><![CDATA[#[output application/java
+---
+{
+	"name" : attributes.uriParams.name
+}]]]></http:uri-params>
+			<http:query-params><![CDATA[#[output application/java
+---
+{
+	"endDate" : attributes.queryParams.endDate,
+	"startDate" : attributes.queryParams.startDate,
+	"user" : attributes.queryParams.user
+}]]]></http:query-params>
+		</http:request>
+				<ee:transform doc:name="InvoiceLine" doc:id="e669b4b3-1fd5-45e3-b338-9e6e596158a5">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json 
+---
+((payload.employees_details map {
+    "emp_name": $.emp_name,
+    "hours": $.hours
+}) groupBy ($.emp_name) pluck ($) map{
+    "emp_name" : $.emp_name[0],
+    "hours": $.hours reduce ($ + $$)
+}) filter ($.hours > 0)]]></ee:set-payload>
+			</ee:message>
+					<ee:variables >
+						<ee:set-variable variableName="reqb_data" ><![CDATA[%dw 2.0
+output application/json 
+var months = [
+'January',
+'February',
+'March',
+'April',
+'May',
+'June',
+'July',
+'August',
+'September',
+'October',
+'November',
+'December'
+]
+var val=(
+((payload.employees_details map {
+    "emp_name": $.emp_name,
+    "hours": $.hours
+}) groupBy ($.emp_name) pluck ($) map{
+    "emp_name" : $.emp_name[0],
+    "hours": $.hours reduce ($ + $$)
+}) filter ($.hours > 0)
+)
+
+---
+{
+	"month" : months [vars.date.month -1 ],
+	"project_name": vars.project
+	
+}++ (
+if(sizeOf(val)>1)({"emp_name": "All", "hours":sum(val.hours)})
+else(val[0])
+)
+
+
+
+
+]]></ee:set-variable>
+					</ee:variables>
+		</ee:transform>
+				<flow-ref doc:name="getRates" doc:id="6a5080d7-79ce-467f-9d0a-127299bea8cc" name="getRates" />
+			</when>
+			<otherwise>
+				<logger level="INFO" doc:name="Logger" doc:id="d13aca0c-8199-4f75-929f-f38fe7317286" message='#["Default"]' />
+			</otherwise>
+		</choice>
+	</sub-flow>
+	<sub-flow name="getRates" doc:id="69f0e462-dd30-4e3f-97e2-99aa62709d0f" >
+		<set-variable doc:name="Set Variable" doc:id="171dceed-2117-44da-bc0c-914223327d24" variableName="withRate" value="#[[]]" />
+		<foreach doc:name="For Each" doc:id="c5b5419e-c6a0-44ef-900b-1e6855b5a0f0">
+					<set-variable value="#[payload.emp_name]" doc:name="Set Variable" doc:id="62a20804-733d-4d16-bf2a-9b5d9382555d" variableName="resource" />
+					<flow-ref doc:name="retreiveRate" doc:id="48fa5a34-f9b6-4b14-9ee1-fde2e7deb981" name="retreiveRate" target="rate" />
+					<logger level="INFO" doc:name="Logger" doc:id="d7f311f8-f5cc-488e-970b-9da5ca26095a" message="#[vars.rate]" />
+					<set-variable value="#[%dw 2.0
+output application/json 
+---
+payload ++ vars.rate]" doc:name="Set Variable" doc:id="d2630c9a-d116-4209-82bd-ab2e5ce8eeb1" variableName="rate" />
+					<set-variable value="#[output application/json 
+--- 
+vars.withRate + vars.rate]" doc:name="Set Variable" doc:id="dddaaac3-b32c-4adf-bf0c-299e399311d1" variableName="withRate" />
+				</foreach>
+		<set-payload value="#[vars.withRate]" doc:name="Set Payload" doc:id="d76a4290-2a82-4473-a54e-eea812be69ab" />
+	</sub-flow>
+	<sub-flow name="createInvoice" doc:id="8f4dea80-b7f1-4bf7-a8ad-423b8b8b0808" >
+		<os:retrieve doc:name="Retrieve QBToken" doc:id="be973142-c10b-4745-85a9-7f10c02b49d0" key="access_tokenQB" objectStore="Object_store" target="QB">
+			<os:default-value><![CDATA[#[null]]]></os:default-value>
+		</os:retrieve>
+		<set-variable value="#[{}]" doc:name="Store Invoice" doc:id="4c5085a8-6340-4de4-b0fe-23304b1a55c0" variableName="invoice" />
+		<ee:transform doc:name="Data To CreateInvoice" doc:id="89c22125-2cee-4a43-a97c-d2473aed7fb7">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+  "Line": 
+    (payload map{ 
+  "Description": "Consulting Fees: " ++ $.emp_name ++ "\n" ++ "Services for the period from " ++ vars.startDate ++ " to " ++ vars.endDate,
+      "DetailType": "SalesItemLineDetail",
+      "Amount":($.hours) * ($.BillRate) ,
+      "SalesItemLineDetail": {
+        "ItemRef": {
+         "value": "20"
+        },
+        "UnitPrice": $.BillRate,
+        "Qty":$.hours
+      }
+    })
+ ,
+ (if (payload[0].Client == "Mulesoft")
+  { "CustomField": [
+       {
+        "DefinitionId": "1",
+        "StringValue": payload[0].Resource,
+        "Type": "StringType",
+        "Name": "Consultant Name"
+      },
+       {
+        "DefinitionId": "2",
+        "StringValue": payload[0].PONumber,
+        "Type": "StringType",
+        "Name": "PO Number"
+      },
+       {
+        "DefinitionId": "3",
+        "StringValue": payload[0].ProjectName,
+        "Type": "StringType",
+        "Name": "Project Name"
+      }
+    ] }
+else if(  payload[0].Client != "Mulesoft" and payload[0].PONumber != "")
+ { "CustomField": [
+     {
+        "DefinitionId": "2",
+        "StringValue": payload[0].PONumber,
+        "Type": "StringType",
+        "Name": "PO Number"
+      }
+] } else {}),
+"CustomerRef": {
+        "value": "90"
+    },
+       "BillEmail": {
+        "Address": payload[0].CientMailId
+    },
+    "BillEmailCc":{
+    	"Address": payload[0].ccmailid
+    },
+    "PrivateNote": "Invoice",
+    "CustomerMemo": {
+        "value": "Thank you for your business and have a great day!"
+    }
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="89dba9b2-73e8-4dba-a9a7-c62bd2440dcb" message="#[payload]"/>
+		<http:request method="POST" doc:name="Request QBCreateInvoice" doc:id="a9239da9-4be3-434a-99fa-6b5a2d84f231" config-ref="Sandbox_HTTP_Request_configuration" path="${qbook.invoice_path}" responseTimeout="40000">
+			<http:headers><![CDATA[#[output application/java
+---
+{
+	"Authorization" : vars.QB
+}]]]></http:headers>
+		</http:request>
+		<logger level="INFO" doc:name="Logger" doc:id="07b6b196-ba58-457d-9f5d-5f03e7e31862" message="#[payload]" />
+		<flow-ref doc:name="Flow Reference" doc:id="1031ed13-69a8-44e4-af47-b106ad8d5ffe" name="storeInvoiceID"/>
+		<logger level="INFO" doc:name="Logger" doc:id="d3702efa-8e84-48c0-8c40-59d17a897da6" message="*******************Id of invoice created is #[payload.IntuitResponse.Invoice.Id]************************" />
+		<ee:transform doc:name="Transform Message" doc:id="7bee2c47-41c6-4a54-b280-f44248b99b3c" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json 
+---
+[{
+    "invoice_id": payload.IntuitResponse.Invoice.Id as Number,
+    "project_name": vars.project,
+    "doc_number": payload.IntuitResponse.Invoice.DocNumber as Number,
+    "url": "http://qb-online-integration.us-e2.cloudhub.io/checkInvoice/" ++ vars.project ++ "/" ++  (payload.IntuitResponse.Invoice.Id as Number)
+}
+]]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</sub-flow>
+	<sub-flow name="initialize" doc:id="f66a06a5-28bc-4cd6-ab10-46c206b5fe71" >
+		<set-variable value="#[attributes.uriParams.name]" doc:name="project" doc:id="3a766ec6-40ae-4c07-b806-a69c9a0c2029" variableName="project" />
+		<set-variable value='#[attributes.queryParams.user default "All"]' doc:name="resource" doc:id="7b5b670c-6aab-444a-be02-99c391a9bd4a" variableName="resource" />
+		<logger level="INFO" doc:name="Logger" doc:id="c1f04170-1e21-4079-b390-e91a68f84868" message="#[vars.resource]" />
+		<ee:transform doc:name="Store Data" doc:id="269fff5d-be3c-4603-895c-e8a9495b4ee6">
+			<ee:message>
+			</ee:message>
+			<ee:variables>
+				<ee:set-variable variableName="endDate"><![CDATA[%dw 2.0
+output application/json
+---
+attributes.queryParams.endDate as Date as String {format: "MM/dd/yyyy"}]]></ee:set-variable>
+				<ee:set-variable variableName="startDate"><![CDATA[%dw 2.0
+output application/json
+---
+attributes.queryParams.startDate as Date as String {format: "MM/dd/yyyy"}]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+	</sub-flow>
+	<flow name="quickbook-api-flow" doc:id="4a0ec00c-a37d-46ba-a616-019da0a212aa" initialState="started">
+		<http:listener doc:name="Quick Book Listener" doc:id="1d913b26-8a37-481e-8d04-c2a06df0efeb" path="${qbook.listener_path}" allowedMethods="GET" config-ref="HTTP_Listener_config">
+			<http:response >
+				<http:headers ><![CDATA[#[output application/java
+---
+{
+	"Access-Control-Allow-Origin" : "*"
+}]]]></http:headers>
+			</http:response>
+		</http:listener>
+		<flow-ref doc:name="initialize" doc:id="817e2e14-a465-48ca-8894-40a68bbe424f" name="initialize" />
+		<flow-ref doc:name="validation" doc:id="054f93ec-c6cb-4690-b8d8-1fad0385e2ec" name="validateInvoice"/>
+		<choice doc:name="Choice" doc:id="a4b461ee-003c-4bb7-bac6-f073b601eeae">
+			<when expression='#[vars.invoiceID == "0"]'>
+				<logger level="INFO" doc:name="Logger" doc:id="fb3364c7-781a-459e-8736-61b1cf4d7199" message="#[vars.invoiceID]" />
+				<flow-ref doc:name="getDetails" doc:id="739ba62e-28d6-4acb-b321-046d75d2bbb8" name="getDetails" />
+				<flow-ref doc:name="createInvoice" doc:id="77c7d452-41af-47c9-a74d-51dc6c115e11" name="createInvoice" />
+			</when>
+			<otherwise>
+				<ee:transform doc:name="Transform Message" doc:id="d8b2088b-0123-4e7d-89a1-e9d506a41636">
+					<ee:message>
+						<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+ "Invoice Already created"]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</otherwise>
+		</choice>
+	</flow>
+	
+</mule>

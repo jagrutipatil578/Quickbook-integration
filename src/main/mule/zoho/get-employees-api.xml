@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+	<flow name="get-employees-api" doc:id="e6652457-3ac8-4002-8e62-26561dcc87c3" >
+		<http:listener doc:name="Get Employees Listener" doc:id="6fd40b80-6a6a-4966-b31e-5ccda3f7af4d" path="${get_employees.listener_path}" allowedMethods="GET" config-ref="HTTP_Listener_config">
+			<http:response >
+				<http:headers ><![CDATA[#[output application/java
+---
+{
+	"Access-Control-Allow-Origin" : "*"
+}]]]></http:headers>
+			</http:response>
+		</http:listener>
+		<logger level="INFO" doc:name="Logger" doc:id="8482b803-31c1-4082-8fe1-5a517c040266" message="**********Started fetching active employees from Zoho********"/>
+		<set-variable value="1" doc:name="Start Index" doc:id="35af0141-2043-4110-9cc3-8cf9b28c1a42" variableName="index"/>
+		<set-variable value="#[[]]" doc:name="Initial Data" doc:id="60e015fd-1262-4726-87ec-856d8c3950cf" variableName="store"/>
+		<flow-ref doc:name="Get Data from Zoho" doc:id="128454a3-936d-4e4d-a860-4ad19309109a" name="get-employees-apiFlow"/>
+		<ee:transform doc:name="Active Employees Response" doc:id="d4eabf7f-e0f4-404d-a1dd-b6129ddde403" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[  %dw 2.0
+output application/json
+---
+(vars.store map {
+    "emp_id": $."EmployeeID",
+    "emp_name": $."First Name" ++ " " ++ $."Last Name" default "",
+    "email_id": $."Email ID"
+}) filter($.emp_id != null and $.emp_name != null and $.email_id != null)
+   orderBy ($.emp_id)
+	
+]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="b56c4d85-72f2-4060-8a18-a3baa70313ab" message="**********Completed fetching employees details from Zoho********"/>
+	</flow>
+	<flow name="get-employees-apiFlow" doc:id="afe1168b-7188-4611-ba75-53e04f77cb0a" >
+		<http:request method="GET" doc:name="Get Employees Zoho" doc:id="b6505512-5d68-4575-9e34-3852fcd2816c" config-ref="Zoho_People_HTTP_Request_configuration" path="${get_employees.getemployeespath}" responseTimeout="200000" target="response">
+			<http:query-params><![CDATA[#[output application/java
+---
+{
+	"sIndex" : vars.index,
+	"rec_limit" : p('get_employees.recordlimit'),
+	"authtoken" : p('zoho.authtoken')
+}]]]></http:query-params>
+		</http:request>
+		<logger level="INFO" doc:name="Logger" doc:id="3ffb8257-c543-4df4-9ea2-a7f7ad42f1f7" message="#[vars.response]"/>
+		<choice doc:name="Choice" doc:id="9561ae52-0d87-4017-801e-0bd0b0e9272e" >
+			<when expression="#[sizeOf(vars.response) &gt; 1]">
+				<set-variable value="#[vars.index as Number + p('get_employees.recordlimit') as Number]" doc:name="Updated Start Index" doc:id="656581b4-0fdb-4d53-bee5-14de02ee6fd6" variableName="index" />
+				<ee:transform doc:name="Store Data" doc:id="25a43703-62da-4721-befa-e3b85c850d87">
+				<ee:message>
+				</ee:message>
+				<ee:variables>
+					<ee:set-variable variableName="store"><![CDATA[%dw 2.0
+output application/json
+---
+(vars.store ++ vars.response)]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+				<flow-ref doc:name="Get Data from Zoho" doc:id="9603ad36-a4f8-457a-b1ef-98635741d59f" name="get-employees-apiFlow"/>
+			</when>
+			<otherwise >
+				<logger level="INFO" doc:name="Logger" doc:id="d98ad0a3-f50b-410b-a923-617db122ddae" message="********Completed fetching the employee details**********"/>
+			</otherwise>
+		</choice>
+	</flow>
+
+
+</mule>

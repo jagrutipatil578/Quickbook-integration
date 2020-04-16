@@ -1,0 +1,8 @@
+{
+  "sampleData": {
+    "f90eb370-a807-42c2-94cd-c61a5f5c16e8": {
+      "payload": "sample_data/list_message.dwl",
+      "attributes": "sample_data/defaultvoidtype.dwl"
+    }
+  }
+}

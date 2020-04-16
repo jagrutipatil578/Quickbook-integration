@@ -1,0 +1,11 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<types:mule xmlns:types="http://www.mulesoft.org/schema/mule/types">
+  <types:catalog>
+    <types:type name="path" format="java">
+      <types:shape format="raml"><![CDATA[#%RAML 1.0 DataType
+type: string]]></types:shape>
+    </types:type>
+  </types:catalog>
+  <types:enrichment select="#269fff5d-be3c-4603-895c-e8a9495b4ee6"/>
+  <types:enrichment select="#5e686ce1-5218-4d6a-b379-385c51ede44e"/>
+</types:mule>

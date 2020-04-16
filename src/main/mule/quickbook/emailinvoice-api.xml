@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:java="http://www.mulesoft.org/schema/mule/java"
+	xmlns:os="http://www.mulesoft.org/schema/mule/os"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:file="http://www.mulesoft.org/schema/mule/file" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd 
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd 
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd
+http://www.mulesoft.org/schema/mule/java http://www.mulesoft.org/schema/mule/java/current/mule-java.xsd">
+	<sub-flow name="email-InitializeVariables" doc:id="faaa3a81-5f83-4429-921f-200ace46e74e" >
+		<set-variable value="#[attributes.uriParams.invoiceID]" doc:name="InvoiceId" doc:id="a2492945-aa99-43b9-915a-c5b0f7cdd6e4" variableName="InvoiceId" />
+	</sub-flow>
+	<sub-flow name="email-invoice" doc:id="035f1d85-8441-45d7-8520-38ffb4412845" >
+		<os:retrieve doc:name="Retrieve QBToken" doc:id="bfefb7f6-501d-406f-baa9-7a0de04a9c1b" key="access_tokenQB" objectStore="Object_store" target="QB">
+			<os:default-value><![CDATA[#[null]]]></os:default-value>
+		</os:retrieve>
+		<logger level="INFO" doc:name="Logger" doc:id="86189e35-739d-4886-b1b6-5dd411b41dac" message="#[vars.QB]"/>
+		<http:request method="POST" doc:name="send-an-invoice" doc:id="72b0ea89-4019-44cc-b60c-e3046c24d15e" config-ref="Sandbox_HTTP_Request_configuration" path='${qbook.email_invoice_path}' outputMimeType="application/octet-stream">
+			<http:body ><![CDATA[#[Null]]]></http:body>
+			<http:headers ><![CDATA[#[output application/java
+---
+{
+	"Authorization" : vars.QB
+}]]]></http:headers>
+			<http:uri-params ><![CDATA[#[output application/java
+---
+{
+	"id" : vars.InvoiceId
+}]]]></http:uri-params>
+		</http:request>
+		<ee:transform doc:name="Transform Message" doc:id="fea1fb35-2747-401d-9bf9-f45d6bb484cb" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload
+ ]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		
+	</sub-flow>
+	<flow name="send-an-invoice" doc:id="924932cd-3f51-458f-8a21-11c6e91a8bd1" >
+		<http:listener doc:name="GDrive Listener" doc:id="4b0e0043-0775-42ad-9a5d-3b104645ea53" config-ref="HTTP_Listener_config" path="${qbook.emailInvoice_path}">
+			<http:response >
+				<http:headers ><![CDATA[#[output application/java
+---
+{
+	"Access-Control-Allow-Origin" : "*"
+}]]]></http:headers>
+			</http:response>
+		</http:listener>
+		<logger level="INFO" doc:name="Logger" doc:id="d8a00191-2b0b-4fb9-97d9-d8df885604a7" message="**************Started fetching invoice ******************" />
+		<flow-ref doc:name="email-InitializeVariables" doc:id="d49a792c-3d9e-4d40-825f-a152b729a62a" name="email-InitializeVariables" />
+		<flow-ref doc:name="Email-invoice" doc:id="651258cd-9668-42d2-8c9d-71511b4aec86" name="email-invoice" />
+	</flow>
+	
+	
+</mule>

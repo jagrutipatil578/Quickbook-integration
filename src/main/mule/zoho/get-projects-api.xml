@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:os="http://www.mulesoft.org/schema/mule/os" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd">
+	<os:object-store name="projectStore" doc:name="Object store" doc:id="760fc1b3-ddb9-438d-9106-122c22394cd8" />
+	<flow name="getprojectFlow" doc:id="77d0438d-4b3b-437e-8f60-5eb1566d5125" >
+		<http:listener doc:name="Get Project Listener" doc:id="b0fc5083-f1cf-47ae-a5ea-2b6d4ea64ef2" config-ref="HTTP_Listener_config" path="${get_projects.listener_path}">
+			<http:response >
+				<http:headers ><![CDATA[#[output application/java
+---
+{
+	"Access-Control-Allow-Origin" : "*"
+}]]]></http:headers>
+			</http:response>
+		</http:listener>
+		<logger level="INFO" doc:name="Logger" doc:id="aef64a5b-d589-4c4e-b687-6f44c2574317" message="**********Started fetching projects from Zoho********"/>
+		<http:request method="GET" doc:name="Get Projects Zoho" doc:id="7beb860e-add9-46f6-98a4-e03c0078d097" path="${zoho.getprojects_path}" config-ref="Zoho_People_HTTP_Request_configuration">
+			<http:query-params ><![CDATA[#[output application/java
+---
+{
+	"authtoken" : p('zoho.authtoken'),
+	"assignedTo" : "all"
+}]]]></http:query-params>
+
+		</http:request>
+		<logger level="INFO" doc:name="Logger" doc:id="a31c4af6-4469-4994-8aa7-b840ca621ac9" message="#[payload]"/>
+		<ee:transform doc:name="Project Status Response" doc:id="88048d34-7fad-4e30-b37f-00ff51ecd4ae" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+flatten(payload.*response.result) map {
+	project_id: $.projectId,
+    project_name: $.projectName,
+    project_status: $.projectStatus,
+    client: $.clientName
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	<!--  	<foreach doc:name="For Each" doc:id="194f3bf6-d0f3-4165-9dc3-00f85600ef5b" >
+			<logger level="INFO" doc:name="Logger" doc:id="33509886-5520-406c-8bfd-98ada44cb646" message="#[payload]"/>
+			<set-variable value="#[%dw 2.0
+output application/json
+-&#45;&#45;
+vars.proj_acc ++ payload.response.result[0]]" doc:name="Set Variable" doc:id="2e4a6cd4-b86a-464c-9771-96c3fcf6b6a8" variableName="proj_acc"/>
+		</foreach> -->
+	
+</flow>
+	<flow name="ResourcesByProject" doc:id="16678873-a212-4bf2-b324-2dc4b76fdc79" >
+		<http:listener doc:name="Listener" doc:id="bec49c58-55f3-4c19-ac46-91ebccc8804d" config-ref="HTTP_Listener_config" path="/resources/{project}">
+			<http:response >
+				<http:headers ><![CDATA[#[output application/java
+---
+{
+	"Access-Control-Allow-Origin" : "*"
+}]]]></http:headers>
+			</http:response>
+		</http:listener>
+		<set-variable value="#[attributes.uriParams.project]" doc:name="Set Variable" doc:id="65b05655-3d6d-4c9a-bfef-0246d9c19550" variableName="project"/>
+		<flow-ref doc:name="getprojectFlow" doc:id="3ebad5af-34a0-428d-82a7-e0afd3d5efe1" name="getprojectFlow"/>
+		<ee:transform doc:name="Transform Message" doc:id="15e8a428-d9e6-4877-85b2-676f7131d52e" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+(payload filter ($.project_name == vars.project) map 
+$.project_id)[0]]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<http:request method="GET" doc:name="Request" doc:id="6b4dd2a8-5d88-4995-83aa-e2f3f31fcb10" config-ref="Zoho_People_HTTP_Request_configuration" path="/people/api/timetracker/getprojectdetails">
+			<http:query-params><![CDATA[#[output application/java
+---
+{
+	"projectId" : payload,
+	"authtoken" : p('zoho.authtoken')
+}]]]></http:query-params>
+		</http:request>
+		<ee:transform doc:name="Transform Message" doc:id="b4aff3c8-1373-4925-a6b6-a06ab9a14ad9">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+payload.response.result[0].projectUsers map {
+    resource: $.name
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+	<flow name="get-projects-apiFlow" doc:id="a4032ef5-7d2d-4138-932a-1565e9733d6d" >
+		<http:listener doc:name="Listener" doc:id="b346dd9b-a67e-493c-8c1e-0d4d20134b30" config-ref="HTTP_Listener_config" path="/projects"/>
+		<os:retrieve-all-keys doc:name="Retrieve all keys" doc:id="906a8565-1cc7-4288-8a55-dee928c26402" objectStore="projectStore"/>
+		<set-variable value="#[[]]" doc:name="Set Variable" doc:id="63b9f628-f7be-433d-b766-8c7488c0c6a5" variableName="resources"/>
+		<foreach doc:name="For Each" doc:id="0f3cbf84-45ff-4900-8820-9070ca3abd4d" >
+			<os:retrieve doc:name="Retrieve" doc:id="dc4a7c69-8cf0-4a3c-a3f4-7611880ca4cc" key='#[payload]' target="projectId" objectStore="projectStore"/>
+			<set-variable value="#[payload]" doc:name="Set Variable" doc:id="86e3eb0a-931f-4475-9e8e-71c55454159a" variableName="projectName"/>
+			<http:request method="GET" doc:name="Copy_of_Request" doc:id="966ce0fa-f8fb-4f29-a9d2-6ee5462ac056" config-ref="Zoho_People_HTTP_Request_configuration" path="/people/api/timetracker/getprojectdetails" >
+				<http:query-params ><![CDATA[#[output application/java
+---
+{
+	"projectId" : vars.projectId,
+	"authtoken" : p('zoho.authtoken')
+}]]]></http:query-params>
+			</http:request>
+			<ee:transform doc:name="Copy_of_Transform Message" doc:id="76f4747d-c2ab-4e50-8344-83d7b01babf1" >
+				<ee:message >
+					<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload.response.result[0].projectUsers map {
+    resource: $.name,
+    project:vars.projectName,
+    client:payload.response.result[0].clientName
+}]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+			<set-variable value="#[output application/json
+---
+vars.resources + payload]" doc:name="Set Variable" doc:id="f40e0259-d6e2-4f92-a3a8-85033d0d5a9f" variableName="resources"/>
+			<ee:transform doc:name="Copy_of_Wait" doc:id="b2a4342d-3222-40d2-8af8-1e869b1a86a6" >
+				<ee:message />
+				<ee:variables >
+					<ee:set-variable variableName="wait" ><![CDATA[%dw 2.0
+import * from dw::Runtime
+output application/java
+---
+{"user" : 1} wait 3000
+]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+		</foreach>
+		<set-payload value="#[vars.resources]" doc:name="Set Payload" doc:id="fffd69ba-ff8d-49c4-af6c-e50bc2e9bc29" />
+	</flow>
+
+</mule>

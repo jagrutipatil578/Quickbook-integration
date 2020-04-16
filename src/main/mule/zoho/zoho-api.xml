@@ -1,0 +1,224 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+	<flow name="zoho-api-flow" doc:id="d87c9ebd-77e6-4a5f-989b-a83f8aa971be" >
+		<http:listener doc:name="Zoho Listener" doc:id="48b2ba81-37a3-4dbd-b26f-adae68500e2f" path="${zoho.listener_path}" allowedMethods="GET" config-ref="HTTP_Listener_config">
+			<http:response >
+				<http:headers ><![CDATA[#[output application/java
+---
+{
+	"Access-Control-Allow-Origin" : "*"
+}]]]></http:headers>
+			</http:response>
+		</http:listener>
+		<logger level="INFO" doc:name="Logger" doc:id="0bb62b41-f0c2-4bea-abff-07ed6568a503" message='**************Started fetching the hours from ZOHO******************'/>
+		<set-variable value="#[attributes.uriParams.name]" doc:name="Project Name" doc:id="62a4a759-89e7-4911-a575-1b81b0e710b7" variableName="project_name"/>
+		<ee:transform doc:name="Store Data" doc:id="3b10ec1f-b7cf-486d-8373-6b7f53820c60" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="empname" ><![CDATA[%dw 2.0
+output application/json
+---
+attributes.queryParams.user]]></ee:set-variable>
+				<ee:set-variable variableName="toDate" ><![CDATA[%dw 2.0
+output application/json
+fun dayofweek(date) = date.dayOfWeek
+var endDate = attributes.queryParams.endDate
+---
+if(dayofweek(endDate) == 6) 
+	endDate 	
+else
+    endDate + "P$(6 - dayofweek(endDate))D"]]></ee:set-variable>
+				<ee:set-variable variableName="fromDate" ><![CDATA[%dw 2.0
+output application/json
+fun dayofweek(date) = date.dayOfWeek
+var startDate = attributes.queryParams.startDate
+---
+if(dayofweek(startDate) == 7)
+ 	 startDate 
+else 
+	startDate - "P$(dayofweek(startDate))D"]]></ee:set-variable>
+				<ee:set-variable variableName="startDate" ><![CDATA[%dw 2.0
+output application/json
+---
+attributes.queryParams.startDate]]></ee:set-variable>
+				<ee:set-variable variableName="endDate" ><![CDATA[%dw 2.0
+output application/json
+---
+attributes.queryParams.endDate]]></ee:set-variable>
+			
+</ee:variables>
+		</ee:transform>
+		<http:request method="GET" doc:name="Get Projects Details" doc:id="666a5c12-3a25-48e5-9cea-1e62da6766ac" path="${zoho.getprojects_path}" config-ref="Zoho_People_HTTP_Request_configuration" responseTimeout="40000">
+			<http:query-params ><![CDATA[#[output application/java
+---
+{
+	"authtoken" : p('zoho.authtoken'),
+	"assignedTo" : "all"
+}]]]></http:query-params>
+		</http:request>
+		<set-variable value='#[%dw 2.0
+output application/json
+---
+{(payload.response.result filter ((item, index) -&gt; item.projectName==vars.project_name))}.projectId]' doc:name="Project ID" doc:id="8acb7e40-8fd8-4a6d-aa8a-2e7c0e512c40" variableName="projectId"/>
+		<logger level="INFO" doc:name="Logger" doc:id="b6e198ca-8f1c-4492-843d-a255fb7ea21f" message="Project name is : #[vars.project_name]"/>
+		<http:request method="GET" doc:name="Get Employees for Specific Project" doc:id="2d69b4c4-2885-4573-8e4a-a54fbd098084" config-ref="Zoho_People_HTTP_Request_configuration" path="${zoho.getprojectdeatils_path}">
+			<http:query-params ><![CDATA[#[output application/java
+---
+{
+	"authtoken" : p('zoho.authtoken'),
+	"projectId" : vars.projectId
+}]]]></http:query-params>
+		</http:request>
+		<set-variable value="#[{}]" doc:name="Set Variable" doc:id="f8e0c83a-2263-4741-a864-d105e2202ff7" variableName="emp"/>
+		<choice doc:name="Choice" doc:id="7a8fa504-05fa-4552-b1b6-8bbcb8df9529" >
+			<when expression="#[!isEmpty(vars.project_name) and !isEmpty(vars.empname)]">
+				<ee:transform doc:name="IDs Of Employess Working Under Project" doc:id="08ce7a5a-489b-4ff3-be00-3428d043d1c8">
+			<ee:message>
+				<ee:set-payload><![CDATA[output application/json
+---
+(payload.response.result.projectUsers[0] filter ((item, index) -> item.name == vars.empname)).erecno]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+			</when>
+			<otherwise >
+				<ee:transform doc:name="All Emps for Project" doc:id="918416f5-ed08-4f32-9792-0129e6726009" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload.response.result.projectUsers[0].erecno]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</otherwise>
+		</choice>
+		<foreach doc:name="For Each" doc:id="2145248d-dfaf-4a10-ae1d-bcdea723233c" collection="#[payload]">
+			<http:request method="GET" doc:name="Get Timesheet of Employess" doc:id="968bb591-4f57-4448-a9b1-f4395dd95b56" config-ref="Zoho_People_HTTP_Request_configuration" path="${zoho.gettimesheet_path}">
+			<http:query-params><![CDATA[#[output application/java
+---
+{
+	"fromDate" : vars.fromDate,
+	"toDate" : vars.toDate,
+	"authtoken" : p('zoho.authtoken'),
+	"user" : payload
+}]]]></http:query-params>
+		</http:request>
+			<ee:transform doc:name="Store Timesheet" doc:id="31ac49f2-53b4-4572-9152-fff39af00cb4" >
+				<ee:message >
+				</ee:message>
+				<ee:variables >
+					<ee:set-variable variableName="emp" ><![CDATA[%dw 2.0
+output application/json
+---
+vars.emp ++  payload]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+		</foreach>
+		<ee:transform doc:name="Timesheet IDs of employee" doc:id="90264c80-9e96-4a7e-9913-3bd230e194f7" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+(flatten(vars.emp.*response.result)).recordId
+]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<set-variable value="#[{}]" doc:name="Set Variable" doc:id="5c24e204-ddaf-452e-80bc-a5d9f8e38d1d" variableName="zoho"/>
+		<logger level="INFO" doc:name="Logger" doc:id="725b65db-9ff5-4392-bc1f-e3abd32d6d94" message="******************Getting Details of all timesheets of employee********************"/>
+		<foreach doc:name="For Each" doc:id="20d6dbb0-651f-41d2-9e04-5ccf3a0dd97b" collection="#[payload]">
+			<http:request method="GET" doc:name="Get all timesheet details" doc:id="3b6c71d2-4a91-4b17-9362-f4dd8f75a568" path="${zoho.gettimesheetdetails_path}" target="timesheets" config-ref="Zoho_People_HTTP_Request_configuration" responseTimeout="40000">
+			<http:query-params><![CDATA[#[output application/java
+---
+{
+	"authtoken" : p('zoho.authtoken'),
+	"timesheetId" : payload
+}]]]></http:query-params>
+		</http:request>
+			<ee:transform doc:name="Data for all timesheet" doc:id="5af32dd0-d4f9-43aa-9cf8-7902fc37a9c7">
+				<ee:message>
+				</ee:message>
+				<ee:variables >
+					<ee:set-variable variableName="zoho" ><![CDATA[%dw 2.0
+output application/json
+---
+(vars.zoho ++ vars.timesheets)
+
+]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+			<ee:transform doc:name="Wait" doc:id="b845434e-9d7a-43cb-aa50-96825df4d470">
+				<ee:message>
+				</ee:message>
+				<ee:variables >
+					<ee:set-variable variableName="wait" ><![CDATA[%dw 2.0
+import * from dw::Runtime
+output application/java
+---
+{"user" : 1} wait 5000
+]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+			<logger level="INFO" doc:name="Logger" doc:id="33729419-597a-4ca2-8881-8eb620bb5a0f" message="For each executed for #[vars.counter] number and Payload is #[vars.timesheets]"/>
+		</foreach>
+		<ee:transform doc:name="Transform Message" doc:id="13718885-ec69-4ae4-a7b9-14113204f814" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+fun abc(value) = if(value is Object) (value mapObject ((value, key, index) -> if(value is Object) (key): abc(value) else if(value is Array and (key) ~= "tsArr") (key): abc(value) else (key):(value) ))
+else if(value is Array) (value filter($.projectName == vars.project_name)) else value
+---
+
+abc(vars.zoho)]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+			</ee:variables>
+		</ee:transform>
+		<ee:transform doc:name="StoreHours" doc:id="a536c3b5-2ce7-41df-97de-9823c22d626b" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="hours" ><![CDATA[%dw 2.0
+output application/json
+var a= vars.startDate
+var b= vars.endDate
+var c = payload.*response.result.*tsArr map {
+    "h" : $ filter ($.workDate >= a and $.workDate <= b)
+}
+---
+c.h map {
+    emp_name: $.employeeFirstName[0]  ++ " " ++ $.employeeLastName[0] default "",
+    h: $.hours,
+    startDate: $.workDate[0],
+    endDate: $.workDate[-1]
+} filter ($.h != null)]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<ee:transform doc:name="Transform Message" doc:id="c4d82a8d-1fc4-41be-8ffd-3fdb39d9689f" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[	%dw 2.0
+	output application/json
+	---
+	{
+	    "project_name": vars.project_name,
+	    "employees_details":(payload.*response map(value,index)->{
+	"emp_name": vars.hours.emp_name[index],
+	"start_date": vars.hours.startDate[index],
+	"end_date": vars.hours.endDate[index],
+	"hours": (vars.hours.h[index] map ($ splitBy  (":"))[0] as Number) reduce ((item, acc) -> acc+item) default 0
+	}) filter ($.start_date != null and $.end_date != null)
+	   
+	}
+]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="9cddf802-84fd-4018-b2b1-4d4a573b2993" message='"**************Completed fetching the hours from ZOHO******************'/>
+		
+		
+	
+</flow>
+</mule>
